@@ -24,6 +24,7 @@
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
+byte currentMenu = 0;
 byte selectedItemBackground = 0x1335;
 byte menuTextSize = 3;
 byte menuItemOffset = 45;
@@ -32,7 +33,9 @@ void changeSetting(byte setting, byte value) {
   Serial.println("Changing setting");
 }
 
-void navigateToSubmenu(char target) {
+void navigateToSubmenu(byte target) {
+  currentMenu = target;
+  arraySize = sizeof(allMenus[currentMenu]);
   drawMenu(ST77XX_WHITE);
 }
 
@@ -43,31 +46,31 @@ void changeScale(int scale) {
 class Menu {
   public:
     const char* menuName;
-    void(*onAction)(void);
-    Menu(const char* menuName, void(*onAction)(void)) {
+    byte submenuTarget;
+    void(*onAction)(byte target);
+    Menu(const char* menuName, byte submenuTarget, void(*onAction)(byte target)) {
       this -> menuName = menuName;
+      this -> submenuTarget = submenuTarget;
       this -> onAction = onAction;
     }
 
 };
 
-Menu settingsMenuItems[2] = {Menu("Scale", navigateToSubmenu), Menu("Sensor Mode", navigateToSubmenu)};
-Menu sensorModeMenuItems[3] = {Menu("Velocity", changeSetting), Menu("Mod Wheel", changeSetting), Menu("Octave Shift", changeSetting)};
+Menu settingsMenuItems[2] = {Menu("Scale", 1, navigateToSubmenu), Menu("Sensor Mode", 2, navigateToSubmenu)};
+Menu sensorModeMenuItems[3] = {Menu("Velocity", 0, changeSetting), Menu("Mod Wheel", 0, changeSetting), Menu("Octave Shift", 0, changeSetting)};
 Menu scaleMenuItems[8] = {
-  Menu("Chromatic", changeScale),
-  Menu("Major", changeScale),
-  Menu("Minor", changeScale),
-  Menu("Pentatonic", changeScale),
-  Menu("Lydian", changeScale),
-  Menu("Mixolydian", changeScale),
-  Menu("Aeolian", changeScale),
-  Menu("Whole Tone", changeScale)
+  Menu("Chromatic", 0, changeScale),
+  Menu("Major", 0, changeScale),
+  Menu("Minor", 0, changeScale),
+  Menu("Pentatonic", 0, changeScale),
+  Menu("Lydian", 0, changeScale),
+  Menu("Mixolydian", 0, changeScale),
+  Menu("Aeolian", 0, changeScale),
+  Menu("Whole Tone", 0, changeScale)
 };
 Menu* allMenus[3] = {settingsMenuItems, sensorModeMenuItems, scaleMenuItems};
-byte currentMenu = 0;
 
-//TODO: Do NOT hardcode
-byte arraySize = (sizeof(scaleMenuItems) / sizeof(scaleMenuItems[0]));
+byte arraySize = sizeof(allMenus[currentMenu]);
 byte firstMenuItemIndex = 0;
 byte currentSelectorPosition = 0;
 
@@ -104,7 +107,7 @@ void drawMenu(uint16_t color) {
   drawBackground(ST77XX_BLACK);
   drawSelector();
   byte offsetCounter = 0;
-  byte arraySize = sizeof(allMenus[currentMenu]);
+
   byte startingPoint = firstMenuItemIndex + 2 <= arraySize ?  firstMenuItemIndex  : arraySize - 3;
 
   for (byte i = startingPoint; i < arraySize; i++) {
@@ -137,7 +140,8 @@ void loop() {
   newButtonState2 = digitalRead(4);
   if (newButtonState2 != lastButtonState2) {
     if (newButtonState2) {
-      allMenus[currentMenu][firstMenuItemIndex + 1].onAction();
+      Menu currentItem = allMenus[currentMenu][firstMenuItemIndex + 1];
+      currentItem.onAction(currentItem.submenuTarget);
     }
 
     lastButtonState2 = newButtonState2;
